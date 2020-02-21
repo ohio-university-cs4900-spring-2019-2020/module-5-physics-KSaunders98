@@ -23,7 +23,7 @@ public:
 
     void destroyActor(physx::PxActor* actor);
 
-    void updateSimulation(double dt);
+    void updateSimulation(float dt);
 
 private:
     physx::PxDefaultAllocator allocator;

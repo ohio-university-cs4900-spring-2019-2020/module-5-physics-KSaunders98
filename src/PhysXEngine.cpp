@@ -24,6 +24,7 @@ PhysXEngine::PhysXEngine()
     dispatcher = PxDefaultCpuDispatcherCreate(2);
     s.cpuDispatcher = dispatcher;
     s.filterShader = PxDefaultSimulationFilterShader;
+    s.flags = PxSceneFlag::eENABLE_ACTIVE_ACTORS;
     scene = physics->createScene(s);
 
     PxPvdSceneClient* pvdClient = scene->getScenePvdClient();
@@ -147,17 +148,15 @@ void PhysXEngine::destroyActor(PxActor* actor)
     }
 }
 
-void PhysXEngine::updateSimulation(double dt)
+void PhysXEngine::updateSimulation(float dt)
 {
-    scene->simulate(1.0f / 60.0f);
+    scene->simulate(dt);
     scene->fetchResults(true);
 
-    PxU32 nbActors = scene->getNbActors(PxActorTypeFlag::eRIGID_DYNAMIC);
-    if (nbActors) {
-        std::vector<PxRigidActor*> actors(nbActors);
-        scene->getActors(PxActorTypeFlag::eRIGID_DYNAMIC, reinterpret_cast<PxActor**>(&actors[0]), nbActors);
-
-        for (size_t i = 0; i < nbActors; ++i) {
+    PxU32 numActors = 0;
+    PxActor** actors = scene->getActiveActors(numActors);
+    if (numActors > 0 && actors != nullptr) {
+        for (size_t i = 0; i < numActors; ++i) {
             if (actors[i]->userData != nullptr) {
                 static_cast<WOPhysXActor*>(actors[i]->userData)->pullFromPhysX();
             }

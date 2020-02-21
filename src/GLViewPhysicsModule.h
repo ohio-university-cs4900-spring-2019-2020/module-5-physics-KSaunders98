@@ -31,7 +31,8 @@ public:
    virtual void createPhysicsModuleWayPoints();
    virtual void onResizeWindow( GLsizei width, GLsizei height );
    virtual void onMouseDown( const SDL_MouseButtonEvent& e );
-   virtual void onMouseUp( const SDL_MouseButtonEvent& e );
+   virtual void onMouseDownSelection(unsigned int x, unsigned int y, Camera& cam);
+   virtual void onMouseUp(const SDL_MouseButtonEvent& e);
    virtual void onMouseMove( const SDL_MouseMotionEvent& e );
    virtual void onKeyDown( const SDL_KeyboardEvent& key );
    virtual void onKeyUp( const SDL_KeyboardEvent& key );

@@ -1,10 +1,14 @@
 #include "GLViewPhysicsModule.h"
 
+#include <chrono>
+
 #include "Axes.h" //We can set Axes to on/off with this
 #include "ManagerOpenGLState.h" //We can change OpenGL State attributes with this
 #include "PhysXEngine.h"
 #include "PhysicsEngineODE.h"
 #include "WorldList.h" //This is where we place all of our WOs
+#include "WODynamicConvexMesh.h"
+#include "WOStaticTriangleMesh.h"
 
 //Different WO used by this module
 #include "AftrGLRendererBase.h"
@@ -35,9 +39,6 @@
 
 //If we want to use way points, we need to include this.
 #include "PhysicsModuleWayPoints.h"
-
-#include "WODynamicConvexMesh.h"
-#include "WOStaticTriangleMesh.h"
 
 using namespace Aftr;
 using namespace physx;
@@ -97,7 +98,15 @@ void GLViewPhysicsModule::updateWorld()
         //If you want to add additional functionality, do it after
         //this call.
 
-    physxEngine->updateSimulation(1.0f / 60.0f);
+    using namespace std::chrono;
+
+    // calculate delta time
+    static auto last_time = steady_clock::now();
+    auto now = steady_clock::now();
+    float dt = duration_cast<duration<float>>(now - last_time).count();
+    last_time = now;
+
+    physxEngine->updateSimulation(dt);
 }
 
 void GLViewPhysicsModule::onResizeWindow(GLsizei width, GLsizei height)
@@ -109,6 +118,21 @@ void GLViewPhysicsModule::onMouseDown(const SDL_MouseButtonEvent& e)
 {
     GLView::onMouseDown(e);
 }
+
+void GLViewPhysicsModule::onMouseDownSelection(unsigned int x, unsigned int y, Camera& cam) {
+    GLView::onMouseDownSelection(x, y, cam);
+
+    if (getLastSelectedWO() != nullptr) {
+        Vector pos = *getLastSelectedCoordinate() + Vector(0, 0, 15);
+
+        WOPhysXActor* teapot = WODynamicConvexMesh::New(ManagerEnvironmentConfiguration::getLMM() + "/models/teapot.obj", Vector(2, 2, 2), MESH_SHADING_TYPE::mstFLAT);
+        teapot->setPhysXEngine(physxEngine);
+        teapot->setPosition(pos);
+        teapot->renderOrderType = RENDER_ORDER_TYPE::roOPAQUE;
+        worldLst->push_back(teapot);
+    }
+}
+
 
 void GLViewPhysicsModule::onMouseUp(const SDL_MouseButtonEvent& e)
 {
@@ -208,11 +232,11 @@ void Aftr::GLViewPhysicsModule::loadMap()
     worldLst->push_back(mountain);
     std::cout << wo->getModel()->getBoundingBox() << std::endl;
 
-    WOPhysXActor* cube = WODynamicConvexMesh::New(ManagerEnvironmentConfiguration::getLMM() + "/models/teapot.obj", Vector(3, 3, 3), MESH_SHADING_TYPE::mstFLAT);
-    cube->setPhysXEngine(physxEngine);
-    cube->setPosition(Vector(0, 0, 25));
-    cube->renderOrderType = RENDER_ORDER_TYPE::roOPAQUE;
-    worldLst->push_back(cube);
+    WOPhysXActor* teapot = WODynamicConvexMesh::New(ManagerEnvironmentConfiguration::getLMM() + "/models/teapot.obj", Vector(2, 2, 2), MESH_SHADING_TYPE::mstFLAT);
+    teapot->setPhysXEngine(physxEngine);
+    teapot->setPosition(Vector(0, 0, 25));
+    teapot->renderOrderType = RENDER_ORDER_TYPE::roOPAQUE;
+    worldLst->push_back(teapot);
 
     createPhysicsModuleWayPoints();
 }
