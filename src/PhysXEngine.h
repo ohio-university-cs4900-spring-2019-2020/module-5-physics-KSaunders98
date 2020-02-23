@@ -1,8 +1,11 @@
 #pragma once
 
+#include <map>
+
 #include "PxPhysicsAPI.h"
 
 namespace Aftr {
+class ModelDataSharedID;
 class WOPhysXActor;
 
 class PhysXEngine {
@@ -35,5 +38,8 @@ private:
     physx::PxDefaultCpuDispatcher* dispatcher;
     physx::PxPvd* pvd;
     physx::PxMaterial* defaultMaterial;
+
+    std::map<ModelDataSharedID, physx::PxShape*> triangleMeshShapes;
+    std::map<ModelDataSharedID, physx::PxShape*> convexMeshShapes;
 };
 }

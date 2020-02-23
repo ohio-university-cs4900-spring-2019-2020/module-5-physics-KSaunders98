@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 
 #include "WO.h"
@@ -13,7 +14,7 @@ public:
     virtual ~WOPhysXActor();
 
     virtual void pullFromPhysX();
-    virtual void pushToPhysX();
+    virtual void pushToPhysX() const;
 
     virtual void setPosition(const Vector& newXYZ);
     virtual void setPosition(float x, float y, float z);
@@ -30,10 +31,13 @@ public:
     virtual void rotateAboutGlobalZ(float deltaRadianAngle);
 
     void setPhysXEngine(const std::shared_ptr<PhysXEngine>& engine);
+    void setPhysXUpdateCallback(const std::function<void()>& callback);
 
 protected:
     std::shared_ptr<PhysXEngine> physxEngine;
     physx::PxRigidActor* physxActor;
+    std::function<void()> updateCallback;
+
     WOPhysXActor();
     virtual void createPhysXActor() = 0; // must be implemented by inheriting classes
 };

@@ -4,11 +4,9 @@
 
 #include "Axes.h" //We can set Axes to on/off with this
 #include "ManagerOpenGLState.h" //We can change OpenGL State attributes with this
+#include "NetMessengerClient.h"
 #include "PhysXEngine.h"
-#include "PhysicsEngineODE.h"
 #include "WorldList.h" //This is where we place all of our WOs
-#include "WODynamicConvexMesh.h"
-#include "WOStaticTriangleMesh.h"
 
 //Different WO used by this module
 #include "AftrGLRendererBase.h"
@@ -23,22 +21,13 @@
 #include "ModelMeshDataShared.h"
 #include "ModelMeshSkin.h"
 #include "WO.h"
-#include "WOCar1970sBeater.h"
-#include "WOHumanCal3DPaladin.h"
-#include "WOHumanCyborg.h"
+#include "WODynamicConvexMesh.h"
 #include "WOLight.h"
-#include "WONVDynSphere.h"
-#include "WONVPhysX.h"
-#include "WONVStaticPlane.h"
 #include "WOSkyBox.h"
-#include "WOStatic.h"
-#include "WOStaticPlane.h"
-#include "WOStaticTrimesh.h"
-#include "WOTrimesh.h"
-#include "WOWayPointSpherical.h"
+#include "WOStaticTriangleMesh.h"
 
-//If we want to use way points, we need to include this.
-#include "PhysicsModuleWayPoints.h"
+#include "NetMsgNewModel.h"
+#include "NetMsgUpdateModel.h"
 
 using namespace Aftr;
 using namespace physx;
@@ -68,7 +57,8 @@ GLViewPhysicsModule::GLViewPhysicsModule(const std::vector<std::string>& args)
 
     //GLViewPhysicsModule::onCreate() is invoked after this module's LoadMap() is completed.
 
-    physxEngine = std::make_shared<PhysXEngine>();
+    physxEngine = nullptr;
+    netClient = nullptr;
 }
 
 void GLViewPhysicsModule::onCreate()
@@ -89,7 +79,8 @@ void GLViewPhysicsModule::onCreate()
 GLViewPhysicsModule::~GLViewPhysicsModule()
 {
     //Implicitly calls GLView::~GLView()
-    physxEngine->shutdown();
+    if (physxEngine != nullptr)
+        physxEngine->shutdown();
 }
 
 void GLViewPhysicsModule::updateWorld()
@@ -98,15 +89,17 @@ void GLViewPhysicsModule::updateWorld()
         //If you want to add additional functionality, do it after
         //this call.
 
-    using namespace std::chrono;
+    if (physxEngine != nullptr) {
+        using namespace std::chrono;
 
-    // calculate delta time
-    static auto last_time = steady_clock::now();
-    auto now = steady_clock::now();
-    float dt = duration_cast<duration<float>>(now - last_time).count();
-    last_time = now;
+        // calculate delta time
+        static auto last_time = steady_clock::now();
+        auto now = steady_clock::now();
+        float dt = duration_cast<duration<float>>(now - last_time).count();
+        last_time = now;
 
-    physxEngine->updateSimulation(dt);
+        physxEngine->updateSimulation(dt);
+    }
 }
 
 void GLViewPhysicsModule::onResizeWindow(GLsizei width, GLsizei height)
@@ -119,20 +112,16 @@ void GLViewPhysicsModule::onMouseDown(const SDL_MouseButtonEvent& e)
     GLView::onMouseDown(e);
 }
 
-void GLViewPhysicsModule::onMouseDownSelection(unsigned int x, unsigned int y, Camera& cam) {
+void GLViewPhysicsModule::onMouseDownSelection(unsigned int x, unsigned int y, Camera& cam)
+{
     GLView::onMouseDownSelection(x, y, cam);
 
-    if (getLastSelectedWO() != nullptr) {
+    if (getLastSelectedCoordinate() != nullptr && physxEngine != nullptr) {
         Vector pos = *getLastSelectedCoordinate() + Vector(0, 0, 15);
 
-        WOPhysXActor* teapot = WODynamicConvexMesh::New(ManagerEnvironmentConfiguration::getLMM() + "/models/teapot.obj", Vector(2, 2, 2), MESH_SHADING_TYPE::mstFLAT);
-        teapot->setPhysXEngine(physxEngine);
-        teapot->setPosition(pos);
-        teapot->renderOrderType = RENDER_ORDER_TYPE::roOPAQUE;
-        worldLst->push_back(teapot);
+        spawnNewModel(teapotPath, Vector(2, 2, 2), pos);
     }
 }
-
 
 void GLViewPhysicsModule::onMouseUp(const SDL_MouseButtonEvent& e)
 {
@@ -174,38 +163,18 @@ void Aftr::GLViewPhysicsModule::loadMap()
     this->cam->setPosition(50, 50, 50);
     this->cam->setCameraLookAtPoint(Vector(0, 0, 0));
 
-    std::string shinyRedPlasticCube(ManagerEnvironmentConfiguration::getSMM() + "/models/cube4x4x4redShinyPlastic_pp.wrl");
-    std::string wheeledCar(ManagerEnvironmentConfiguration::getSMM() + "/models/rcx_treads.wrl");
-    std::string grass(ManagerEnvironmentConfiguration::getSMM() + "/models/grassFloor400x400_pp.wrl");
-    std::string human(ManagerEnvironmentConfiguration::getSMM() + "/models/human_chest.wrl");
+    std::string mountainPath(ManagerEnvironmentConfiguration::getLMM() + "/models/mountain.obj");
+    teapotPath = ManagerEnvironmentConfiguration::getLMM() + "/models/teapot.obj";
+
+    std::string port = ManagerEnvironmentConfiguration::getVariableValue("NetServerListenPort");
+    if (port != "12683") {
+        physxEngine = std::make_shared<PhysXEngine>();
+        netClient = std::shared_ptr<NetMessengerClient>(NetMessengerClient::New("127.0.0.1", "12683"));
+    }
 
     //SkyBox Textures readily available
     std::vector<std::string> skyBoxImageNames; //vector to store texture paths
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_water+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_dust+6.jpg" );
     skyBoxImageNames.push_back(ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_mountains+6.jpg");
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_winter+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/early_morning+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_afternoon+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_cloudy+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_cloudy3+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_day+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_day2+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_deepsun+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_evening+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_morning+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_morning2+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_noon+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/sky_warp+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/space_Hubble_Nebula+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/space_gray_matter+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/space_easter+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/space_hot_nebula+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/space_ice_field+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/space_lemon_lime+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/space_milk_chocolate+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/space_solar_bloom+6.jpg" );
-    //skyBoxImageNames.push_back( ManagerEnvironmentConfiguration::getSMM() + "/images/skyboxes/space_thick_rb+6.jpg" );
 
     float ga = 0.1f; //Global Ambient Light level for this module
     ManagerLight::setGlobalAmbientLight(aftrColor4f(ga, ga, ga, 1.0f));
@@ -225,30 +194,49 @@ void Aftr::GLViewPhysicsModule::loadMap()
     wo->renderOrderType = RENDER_ORDER_TYPE::roOPAQUE;
     worldLst->push_back(wo);
 
-    WOPhysXActor* mountain = WOStaticTriangleMesh::New(ManagerEnvironmentConfiguration::getLMM() + "/models/mountain.obj", Vector(1, 1, 1), MESH_SHADING_TYPE::mstFLAT);
-    mountain->setPhysXEngine(physxEngine);
+    WOPhysXActor* mountain = WOStaticTriangleMesh::New(mountainPath, Vector(1, 1, 1), MESH_SHADING_TYPE::mstFLAT);
     mountain->setPosition(Vector(0, 0, 18));
     mountain->renderOrderType = RENDER_ORDER_TYPE::roOPAQUE;
     worldLst->push_back(mountain);
-    std::cout << wo->getModel()->getBoundingBox() << std::endl;
-
-    WOPhysXActor* teapot = WODynamicConvexMesh::New(ManagerEnvironmentConfiguration::getLMM() + "/models/teapot.obj", Vector(2, 2, 2), MESH_SHADING_TYPE::mstFLAT);
-    teapot->setPhysXEngine(physxEngine);
-    teapot->setPosition(Vector(0, 0, 25));
-    teapot->renderOrderType = RENDER_ORDER_TYPE::roOPAQUE;
-    worldLst->push_back(teapot);
-
-    createPhysicsModuleWayPoints();
+    if (physxEngine != nullptr) {
+        mountain->setPhysXEngine(physxEngine);
+    }
 }
 
-void GLViewPhysicsModule::createPhysicsModuleWayPoints()
+void GLViewPhysicsModule::spawnNewModel(const std::string& path, const Vector& scale, const Vector& position)
 {
-    // Create a waypoint with a radius of 3, a frequency of 5 seconds, activated by GLView's camera, and is visible.
-    WayPointParametersBase params(this);
-    params.frequency = 5000;
-    params.useCamera = true;
-    params.visible = true;
-    WOWayPointSpherical* wayPt = WOWP1::New(params, 3);
-    wayPt->setPosition(Vector(50, 0, 3));
-    worldLst->push_back(wayPt);
+    WOPhysXActor* model = WODynamicConvexMesh::New(path, scale, MESH_SHADING_TYPE::mstFLAT);
+    model->setPosition(position);
+    model->renderOrderType = RENDER_ORDER_TYPE::roOPAQUE;
+    worldLst->push_back(model);
+
+    if (physxEngine != nullptr) {
+        unsigned int id = worldLst->getIndexOfWO(model);
+
+        // setup model's physics
+        model->setPhysXEngine(physxEngine);
+
+        // send message to server instance
+        NetMsgNewModel msg;
+        msg.path = path;
+        msg.scale = scale;
+        msg.position = position;
+        netClient->sendNetMsgSynchronousTCP(msg);
+
+        // send physics update to server instance
+        model->setPhysXUpdateCallback([this, id, model]() {
+            // send update message to server
+            NetMsgUpdateModel msg;
+            msg.id = id;
+            msg.displayMatrix = model->getDisplayMatrix();
+            msg.position = model->getPosition();
+            netClient->sendNetMsgSynchronousTCP(msg);
+        });
+    }
+}
+
+void GLViewPhysicsModule::updateModel(unsigned int id, const Mat4& displayMatrix, const Vector& position)
+{
+    worldLst->at(id)->getModel()->setDisplayMatrix(displayMatrix);
+    worldLst->at(id)->setPosition(position);
 }

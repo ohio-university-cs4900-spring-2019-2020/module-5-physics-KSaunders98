@@ -21,7 +21,7 @@ PhysXEngine::PhysXEngine()
 
     PxSceneDesc s(physics->getTolerancesScale());
     s.gravity = PxVec3(0.0f, 0.0f, -9.81f);
-    dispatcher = PxDefaultCpuDispatcherCreate(2);
+    dispatcher = PxDefaultCpuDispatcherCreate(4);
     s.cpuDispatcher = dispatcher;
     s.filterShader = PxDefaultSimulationFilterShader;
     s.flags = PxSceneFlag::eENABLE_ACTIVE_ACTORS;
@@ -46,6 +46,16 @@ PhysXEngine::~PhysXEngine()
 
 void PhysXEngine::shutdown()
 {
+    // release shape maps
+    for (auto const& x : triangleMeshShapes) {
+        x.second->release();
+    }
+    for (auto const& x : convexMeshShapes) {
+        x.second->release();
+    }
+    triangleMeshShapes.clear();
+    convexMeshShapes.clear();
+
     if (defaultMaterial != nullptr) {
         defaultMaterial->release();
         defaultMaterial = nullptr;
@@ -62,7 +72,7 @@ void PhysXEngine::shutdown()
         cooking->release();
         cooking = nullptr;
     }
-    if (pvd) {
+    if (pvd != nullptr) {
         PxPvdTransport* transport = pvd->getTransport();
         pvd->release();
         pvd = nullptr;
@@ -78,64 +88,84 @@ void PhysXEngine::shutdown()
 
 PxRigidActor* PhysXEngine::createTriangleMesh(WOPhysXActor* wo)
 {
-    const std::vector<Vector>& verts = wo->getModel()->getCompositeVertexList();
-    const std::vector<unsigned int>& inds = wo->getModel()->getCompositeIndexList();
+    ModelDataShared* modelData = wo->getModel()->getModelDataShared();
+    ModelDataSharedID modelID(modelData->getFileName(), modelData->getInitialScaleFactor());
+    PxShape* shape;
 
-    // describe triangle mesh geometry
-    PxTriangleMeshDesc desc;
-    desc.points.count = PxU32(verts.size());
-    desc.points.stride = sizeof(Vector);
-    desc.points.data = &verts.front();
-    desc.triangles.count = PxU32(inds.size() / 3);
-    desc.triangles.stride = sizeof(unsigned int) * 3;
-    desc.triangles.data = &inds.front();
+    auto it = triangleMeshShapes.find(modelID);
+    if (it == triangleMeshShapes.end()) {
+        const std::vector<Vector>& verts = wo->getModel()->getCompositeVertexList();
+        const std::vector<unsigned int>& inds = wo->getModel()->getCompositeIndexList();
 
-    // cook geometry into triangle mesh and then shape
-    PxDefaultMemoryOutputStream buf;
-    if (!cooking->cookTriangleMesh(desc, buf))
-        exit(-1);
-    PxDefaultMemoryInputData stream(buf.getData(), buf.getSize());
-    PxTriangleMesh* triangleMesh = physics->createTriangleMesh(stream);
-    PxShape* shape = physics->createShape(PxTriangleMeshGeometry(triangleMesh), *defaultMaterial);
+        // describe triangle mesh geometry
+        PxTriangleMeshDesc desc;
+        desc.points.count = PxU32(verts.size());
+        desc.points.stride = sizeof(Vector);
+        desc.points.data = &verts.front();
+        desc.triangles.count = PxU32(inds.size() / 3);
+        desc.triangles.stride = sizeof(unsigned int) * 3;
+        desc.triangles.data = &inds.front();
+
+        // cook geometry into triangle mesh
+        PxDefaultMemoryOutputStream buf;
+        if (!cooking->cookTriangleMesh(desc, buf))
+            exit(-1);
+        PxDefaultMemoryInputData stream(buf.getData(), buf.getSize());
+        PxTriangleMesh* triangleMesh = physics->createTriangleMesh(stream);
+        
+        // create shape and add it to map
+        shape = physics->createShape(PxTriangleMeshGeometry(triangleMesh), *defaultMaterial);
+        triangleMeshShapes.insert(std::make_pair(modelID, shape));
+    } else {
+        // reuse existing shape
+        shape = it->second;
+    }
 
     // create actor and add it to scene
     PxRigidStatic* actor = PxCreateStatic(*physics, PxTransform(PxVec3(0, 0, 0)), *shape);
     scene->addActor(*actor);
-
     actor->userData = wo;
-
-    shape->release();
 
     return actor;
 }
 
 PxRigidActor* PhysXEngine::createConvexMesh(WOPhysXActor* wo)
 {
-    const std::vector<Vector>& verts = wo->getModel()->getCompositeVertexList();
-    const std::vector<unsigned int>& inds = wo->getModel()->getCompositeIndexList();
+    ModelDataShared* modelData = wo->getModel()->getModelDataShared();
+    ModelDataSharedID modelID(modelData->getFileName(), modelData->getInitialScaleFactor());
+    PxShape* shape;
 
-    // describe convex mesh geometry
-    PxConvexMeshDesc desc;
-    desc.points.count = PxU32(verts.size());
-    desc.points.stride = sizeof(Vector);
-    desc.points.data = &verts.front();
-    desc.flags = PxConvexFlag::eCOMPUTE_CONVEX;
+    auto it = convexMeshShapes.find(modelID);
+    if (it == convexMeshShapes.end()) {
+        const std::vector<Vector>& verts = wo->getModel()->getCompositeVertexList();
+        const std::vector<unsigned int>& inds = wo->getModel()->getCompositeIndexList();
 
-    // cook geometry into triangle mesh and then shape
-    PxDefaultMemoryOutputStream buf;
-    if (!cooking->cookConvexMesh(desc, buf))
-        exit(-1);
-    PxDefaultMemoryInputData stream(buf.getData(), buf.getSize());
-    PxConvexMesh* triangleMesh = physics->createConvexMesh(stream);
-    PxShape* shape = physics->createShape(PxConvexMeshGeometry(triangleMesh), *defaultMaterial);
+        // describe convex mesh geometry
+        PxConvexMeshDesc desc;
+        desc.points.count = PxU32(verts.size());
+        desc.points.stride = sizeof(Vector);
+        desc.points.data = &verts.front();
+        desc.flags = PxConvexFlag::eCOMPUTE_CONVEX;
+
+        // cook geometry into convex mesh
+        PxDefaultMemoryOutputStream buf;
+        if (!cooking->cookConvexMesh(desc, buf))
+            exit(-1);
+        PxDefaultMemoryInputData stream(buf.getData(), buf.getSize());
+        PxConvexMesh* triangleMesh = physics->createConvexMesh(stream);
+
+        // create shape and add it to map
+        shape = physics->createShape(PxConvexMeshGeometry(triangleMesh), *defaultMaterial);
+        convexMeshShapes.insert(std::make_pair(modelID, shape));
+    } else {
+        // reuse existing shape
+        shape = it->second;
+    }
 
     // create actor and add it to scene
     PxRigidDynamic* actor = PxCreateDynamic(*physics, PxTransform(PxVec3(0, 0, 0)), *shape, PxReal(2.0f));
     scene->addActor(*actor);
-
     actor->userData = wo;
-
-    shape->release();
 
     return actor;
 }

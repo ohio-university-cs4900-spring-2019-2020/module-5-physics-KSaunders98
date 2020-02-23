@@ -1,5 +1,4 @@
 #include "WOPhysXActor.h"
-//#include "Mat4.h"
 #include "Model.h"
 
 using namespace Aftr;
@@ -10,6 +9,7 @@ WOPhysXActor::WOPhysXActor()
 {
     physxEngine = nullptr;
     physxActor = nullptr;
+    updateCallback = nullptr;
 }
 
 WOPhysXActor::~WOPhysXActor()
@@ -32,9 +32,12 @@ void WOPhysXActor::pullFromPhysX()
     }
     getModel()->setDisplayMatrix(mat);
     setPosition(p.x, p.y, p.z);
+
+    if (updateCallback != nullptr)
+        updateCallback();
 }
 
-void WOPhysXActor::pushToPhysX()
+void WOPhysXActor::pushToPhysX() const
 {
     if (physxActor != nullptr) {
         Mat4 mat = getDisplayMatrix();
@@ -126,4 +129,8 @@ void WOPhysXActor::rotateAboutGlobalZ(float deltaRadianAngle)
 void WOPhysXActor::setPhysXEngine(const std::shared_ptr<PhysXEngine>& engine) {
     physxEngine = engine;
     createPhysXActor();
+}
+
+void WOPhysXActor::setPhysXUpdateCallback(const std::function<void()>& callback) {
+    updateCallback = callback;
 }
