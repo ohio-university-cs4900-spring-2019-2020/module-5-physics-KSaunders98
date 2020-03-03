@@ -51,7 +51,8 @@ void NetMsgUpdateModel::onMessageArrived()
 
 std::string NetMsgUpdateModel::toString() const
 {
-    std::stringstream ss;
-    ss << "UpdateModel | " << id << " | " << displayMatrix << " | " << position;
-    return ss.str();
+    //std::stringstream ss;
+    //ss << "UpdateModel | " << id << " | " << displayMatrix << " | " << position;
+    //return ss.str();
+    return "";
 }

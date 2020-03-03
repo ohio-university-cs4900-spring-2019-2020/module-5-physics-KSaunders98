@@ -5,6 +5,10 @@
 #include "Axes.h" //We can set Axes to on/off with this
 #include "ManagerOpenGLState.h" //We can change OpenGL State attributes with this
 #include "NetMessengerClient.h"
+#include "NetMessengerServer.h"
+#include "NetMessengerServerListener.h"
+#include "NetMessengerServerSession.h"
+#include "NetMessengerSessionContainer.h"
 #include "PhysXEngine.h"
 #include "WorldList.h" //This is where we place all of our WOs
 
@@ -116,7 +120,7 @@ void GLViewPhysicsModule::onMouseDownSelection(unsigned int x, unsigned int y, C
 {
     GLView::onMouseDownSelection(x, y, cam);
 
-    if (getLastSelectedCoordinate() != nullptr && physxEngine != nullptr) {
+    if (getLastSelectedCoordinate() != nullptr) {
         Vector pos = *getLastSelectedCoordinate() + Vector(0, 0, 15);
 
         spawnNewModel(teapotPath, Vector(2, 2, 2), pos);
@@ -167,8 +171,10 @@ void Aftr::GLViewPhysicsModule::loadMap()
     teapotPath = ManagerEnvironmentConfiguration::getLMM() + "/models/teapot.obj";
 
     std::string port = ManagerEnvironmentConfiguration::getVariableValue("NetServerListenPort");
-    if (port != "12683") {
+    if (port == "12683") {
         physxEngine = std::make_shared<PhysXEngine>();
+        netClient = std::shared_ptr<NetMessengerClient>(NetMessengerClient::New("127.0.0.1", "12682"));
+    } else {
         netClient = std::shared_ptr<NetMessengerClient>(NetMessengerClient::New("127.0.0.1", "12683"));
     }
 
@@ -203,12 +209,21 @@ void Aftr::GLViewPhysicsModule::loadMap()
     }
 }
 
-void GLViewPhysicsModule::spawnNewModel(const std::string& path, const Vector& scale, const Vector& position)
+void GLViewPhysicsModule::spawnNewModel(const std::string& path, const Vector& scale, const Vector& position, bool sendMsg)
 {
     WOPhysXActor* model = WODynamicConvexMesh::New(path, scale, MESH_SHADING_TYPE::mstFLAT);
     model->setPosition(position);
     model->renderOrderType = RENDER_ORDER_TYPE::roOPAQUE;
     worldLst->push_back(model);
+
+    if (sendMsg) {
+        // send msg to other instance
+        NetMsgNewModel msg;
+        msg.path = path;
+        msg.scale = scale;
+        msg.position = position;
+        netClient->sendNetMsgSynchronousTCP(msg);
+    }
 
     if (physxEngine != nullptr) {
         unsigned int id = worldLst->getIndexOfWO(model);
@@ -216,16 +231,8 @@ void GLViewPhysicsModule::spawnNewModel(const std::string& path, const Vector& s
         // setup model's physics
         model->setPhysXEngine(physxEngine);
 
-        // send message to server instance
-        NetMsgNewModel msg;
-        msg.path = path;
-        msg.scale = scale;
-        msg.position = position;
-        netClient->sendNetMsgSynchronousTCP(msg);
-
-        // send physics update to server instance
         model->setPhysXUpdateCallback([this, id, model]() {
-            // send update message to server
+            // send update message to other instance
             NetMsgUpdateModel msg;
             msg.id = id;
             msg.displayMatrix = model->getDisplayMatrix();
