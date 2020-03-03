@@ -9,7 +9,7 @@
 #ifdef AFTR_CONFIG_USE_BOOST
 
 namespace Aftr {
-// message for creating a new model
+// message for updating a model
 class NetMsgUpdateModel : public NetMsg {
 public:
     NetMsgMacroDeclaration(NetMsgUpdateModel);

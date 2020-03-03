@@ -8,6 +8,7 @@ namespace Aftr {
 class Camera;
 class NetMessengerClient;
 class PhysXEngine;
+class WOPhysXActor;
 
 /**
    \class GLViewPhysicsModule
@@ -44,6 +45,7 @@ protected:
     std::string teapotPath;
     std::shared_ptr<PhysXEngine> physxEngine;
     std::shared_ptr<NetMessengerClient> netClient;
+    std::vector<WOPhysXActor*> models;
 };
 
 /** \} */

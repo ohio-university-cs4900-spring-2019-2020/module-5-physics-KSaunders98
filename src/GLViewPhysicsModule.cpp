@@ -215,6 +215,7 @@ void GLViewPhysicsModule::spawnNewModel(const std::string& path, const Vector& s
     model->setPosition(position);
     model->renderOrderType = RENDER_ORDER_TYPE::roOPAQUE;
     worldLst->push_back(model);
+    models.push_back(model);
 
     if (sendMsg) {
         // send msg to other instance
@@ -226,7 +227,7 @@ void GLViewPhysicsModule::spawnNewModel(const std::string& path, const Vector& s
     }
 
     if (physxEngine != nullptr) {
-        unsigned int id = worldLst->getIndexOfWO(model);
+        unsigned int id = static_cast<unsigned int>(models.size()) - 1;
 
         // setup model's physics
         model->setPhysXEngine(physxEngine);
@@ -244,6 +245,6 @@ void GLViewPhysicsModule::spawnNewModel(const std::string& path, const Vector& s
 
 void GLViewPhysicsModule::updateModel(unsigned int id, const Mat4& displayMatrix, const Vector& position)
 {
-    worldLst->at(id)->getModel()->setDisplayMatrix(displayMatrix);
-    worldLst->at(id)->setPosition(position);
+    models.at(id)->getModel()->setDisplayMatrix(displayMatrix);
+    models.at(id)->setPosition(position);
 }

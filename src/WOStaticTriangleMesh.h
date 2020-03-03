@@ -3,6 +3,7 @@
 #include "WOPhysXActor.h"
 
 namespace Aftr {
+// class for a PhysX StaticTriangleMesh Actor
 class WOStaticTriangleMesh : public WOPhysXActor {
 public:
     WOMacroDeclaration(WOStaticTriangleMesh, WOPhysXActor);
