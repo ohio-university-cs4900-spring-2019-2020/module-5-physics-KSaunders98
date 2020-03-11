@@ -7,15 +7,20 @@
 #include "PhysXEngine.h"
 
 namespace Aftr {
+// Class for PhysX RigidActor world objects
 class WOPhysXActor : public WO {
 public:
     WOMacroDeclaration(WOPhysXActor, WO);
 
     virtual ~WOPhysXActor();
 
+    // pull pose data from PhysX (calls updateCallback)
     virtual void pullFromPhysX();
+    // push pose data to PhysX
     virtual void pushToPhysX() const;
 
+    // have to overload all position/rotation updating methods to push those
+    // changes to PhysX
     virtual void setPosition(const Vector& newXYZ);
     virtual void setPosition(float x, float y, float z);
     virtual void setPositionIgnoringAllChildren(const Vector& newXYZ);
@@ -30,7 +35,9 @@ public:
     virtual void rotateAboutGlobalY(float deltaRadianAngle);
     virtual void rotateAboutGlobalZ(float deltaRadianAngle);
 
+    // set WO's PhysXEngine, thus creating its PhysX Actor and data
     void setPhysXEngine(const std::shared_ptr<PhysXEngine>& engine);
+    // set callback for when WO receives a PhysX update
     void setPhysXUpdateCallback(const std::function<void()>& callback);
 
 protected:

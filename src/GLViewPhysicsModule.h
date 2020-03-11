@@ -8,6 +8,7 @@ namespace Aftr {
 class Camera;
 class NetMessengerClient;
 class PhysXEngine;
+class WOPhysXActor;
 
 /**
    \class GLViewPhysicsModule
@@ -34,7 +35,7 @@ public:
     virtual void onMouseMove(const SDL_MouseMotionEvent& e);
     virtual void onKeyDown(const SDL_KeyboardEvent& key);
     virtual void onKeyUp(const SDL_KeyboardEvent& key);
-    void spawnNewModel(const std::string& path, const Vector& scale, const Vector& position);
+    void spawnNewModel(const std::string& path, const Vector& scale, const Vector& position, bool sendMsg = true);
     void updateModel(unsigned int id, const Mat4& displayMatrix, const Vector& position);
 
 protected:
@@ -44,6 +45,7 @@ protected:
     std::string teapotPath;
     std::shared_ptr<PhysXEngine> physxEngine;
     std::shared_ptr<NetMessengerClient> netClient;
+    std::vector<WOPhysXActor*> models;
 };
 
 /** \} */

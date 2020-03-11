@@ -35,7 +35,7 @@ bool NetMsgNewModel::fromStream(NetMessengerStreamBuffer& is)
 void NetMsgNewModel::onMessageArrived()
 {
     // call spawnNewModel in GLView
-    ManagerGLView::getGLView<GLViewPhysicsModule>()->spawnNewModel(path, scale, position);
+    ManagerGLView::getGLView<GLViewPhysicsModule>()->spawnNewModel(path, scale, position, false);
 }
 
 std::string NetMsgNewModel::toString() const
